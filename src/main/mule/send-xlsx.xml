@@ -1,0 +1,91 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:file="http://www.mulesoft.org/schema/mule/file" xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core"
+	xmlns:http="http://www.mulesoft.org/schema/mule/http"
+	xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd
+http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd
+http://www.mulesoft.org/schema/mule/file http://www.mulesoft.org/schema/mule/file/current/mule-file.xsd">
+	<http:listener-config name="HTTP_Listener_config" doc:name="HTTP Listener config" doc:id="62291dc1-544e-4472-958f-ee89f96a638c" >
+		<http:listener-connection host="0.0.0.0" port="8081" />
+	</http:listener-config>
+	<flow name="send-xlsxFlow" doc:id="18a4b0cf-f2a2-44b2-bc29-e5d2ceee9c23" >
+		<http:listener doc:name="/GET" doc:id="075b02ad-b90a-4fcf-be34-b218b98acf04" config-ref="HTTP_Listener_config" path="send-xlsx"/>
+		<set-variable value="#[attributes.queryParams.format]" doc:name="queryParam " doc:id="f23c6852-c183-4e54-830a-80d2b1902b2d" variableName="queryParam Data format"/>
+		<set-variable doc:name="header data format" doc:id="86bcaea2-3888-445e-b000-653b9495d3ad" variableName="headerData format" value="#[attributes.headers.'content-type']"/>
+		<ee:transform doc:name="Transform Message" doc:id="f3da3a25-47f3-4b17-b86b-4b8ac7dc7b7a" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/java
+---
+{
+}]]></ee:set-payload>
+			</ee:message>
+			<ee:variables >
+				<ee:set-variable variableName="requested_data_format" ><![CDATA[%dw 2.0
+output application/json
+---
+ if (isEmpty(vars.queryParamDataFormat) == true)
+   splitBy(vars.headerDataFormat, '/')[1]
+ else
+   vars.queryParamDataFormat
+
+]]></ee:set-variable>
+			</ee:variables>
+		</ee:transform>
+		<file:read doc:name="Read XLSX" doc:id="9d906550-bf4b-433d-9a2b-8a4004e10194" path="C:\MuleSoft\data-transformation\Transformed\airports.json" outputMimeType="application/xlsx"/>
+		<choice doc:name="Choice" doc:id="2afbcd99-675a-4d28-a41f-a545ba9f14fc" >
+			<when expression="#[vars.requested_format == 'csv']">
+				<ee:transform doc:name="to CSV" doc:id="f3b1c75c-48d3-4122-8784-812927b66d6d" >
+					<ee:message >
+						<ee:set-payload ><![CDATA[%dw 2.0
+output application/csv
+---
+payload.airports]]></ee:set-payload>
+					</ee:message>
+				</ee:transform>
+			</when>
+			<when expression="#[vars.requested_format == 'xml']">
+				<ee:transform doc:name="to XML" doc:id="2942d3ee-16a1-4fd9-801e-033256f17e03" >
+					<ee:message >
+						<ee:set-payload ><![CDATA[%dw 2.0
+output application/xml
+---
+{
+	'airports':
+		    {
+	    	"data": payload.airports
+	    }
+}
+]]></ee:set-payload>
+					</ee:message>
+				</ee:transform>
+			</when>
+			<when expression="#[vars.requested_format == 'json']">
+				<ee:transform doc:name="to JSON" doc:id="58a6867e-f23a-4c20-8411-39534a6c3e83" >
+					<ee:message >
+						<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+payload.airports]]></ee:set-payload>
+					</ee:message>
+				</ee:transform>
+			</when>
+			<otherwise >
+				<ee:transform doc:name="JSON when format is specified" doc:id="37c9ac62-99e0-4ace-8a8e-7fca51eeaf23" >
+					<ee:message >
+						<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+{
+"message": vars.requested_format default " " ++ " is not supported data format!"
+   }
+
+
+]]></ee:set-payload>
+					</ee:message>
+				</ee:transform>
+			</otherwise>
+		</choice>
+	</flow>
+</mule>
